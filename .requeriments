@@ -1,0 +1,48 @@
+📌 Requisitos do Aplicativo Orbit
+✅ 1. Requisitos Funcionais
+
+RF01 – O sistema deverá permitir o cadastro e autenticação de usuários por meio de e-mail e senha.
+
+RF02 – O usuário deverá poder criar e editar seu perfil, incluindo foto, descrição, interesses e preferências.
+
+RF03 – O sistema deverá permitir que o usuário visualize eventos disponíveis próximos à sua localização.
+
+RF04 – O usuário deverá poder confirmar presença em eventos futuros ou em andamento.
+
+RF05 – O sistema deverá recomendar perfis de usuários que estejam interessados no mesmo evento.
+
+RF06 – O usuário deverá poder visualizar perfis recomendados dentro do evento selecionado.
+
+RF07 – O sistema deverá permitir que usuários demonstrem interesse mútuo (match).
+
+RF08 – O aplicativo deverá permitir troca de mensagens entre usuários que deram match.
+
+RF09 – O sistema deverá utilizar geolocalização para identificar proximidade com eventos.
+
+RF10 – O usuário deverá poder encerrar participação em um evento a qualquer momento.
+
+✅ 2. Requisitos Não Funcionais
+
+RNF01 – O aplicativo deverá apresentar interface intuitiva e de fácil navegação.
+
+RNF02 – O sistema deverá garantir proteção dos dados pessoais dos usuários.
+
+RNF03 – O aplicativo deverá apresentar tempo de resposta adequado nas ações principais.
+
+RNF04 – A aplicação deverá funcionar em dispositivos Android e iOS.
+
+RNF05 – O sistema deverá armazenar dados de forma segura em banco de dados remoto.
+
+RNF06 – O aplicativo deverá seguir princípios básicos de usabilidade e acessibilidade.
+
+✅ 3. Requisitos Técnicos
+
+RT01 – O aplicativo será desenvolvido utilizando React Native com Expo.
+
+RT02 – A aplicação utilizará APIs para gerenciamento de autenticação e banco de dados.
+
+RT03 – Será utilizado recurso de geolocalização nativo do dispositivo.
+
+RT04 – O sistema utilizará um banco de dados em nuvem para armazenamento das informações.
+
+RT05 – A arquitetura seguirá padrão modular para facilitar manutenção e futuras melhorias.
