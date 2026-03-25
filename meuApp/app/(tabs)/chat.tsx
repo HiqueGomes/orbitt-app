@@ -13,6 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { getMatches, type MatchEntry } from '@/lib/match-storage';
 import { getCurrentUser } from '@/lib/auth-storage';
 import { subscribeChatListRefresh } from '@/lib/chat-list-refresh';
+import { matchEntryAvatarSource } from '@/lib/mock-profile-avatars';
 
 const ORANGE = '#FF7A2A';
 
@@ -70,7 +71,7 @@ export default function ChatScreen() {
           </View>
           <TouchableOpacity
             style={styles.ctaButton}
-            onPress={() => router.push('/(tabs)/')}
+            onPress={() => router.push('/(tabs)')}
             activeOpacity={0.9}>
             <Text style={styles.ctaButtonText}>Clique aqui para encontrar pessoas</Text>
           </TouchableOpacity>
@@ -106,46 +107,52 @@ export default function ChatScreen() {
             <MaterialIcons name="lock" size={24} color={ORANGE} />
             <Text style={styles.matchLockCount}>{matches.length}</Text>
           </View>
-          {matches.map((m) => (
-            <View key={m.id} style={styles.matchAvatarWrap}>
-              {m.photoUri ? (
-                <Image source={{ uri: m.photoUri }} style={styles.matchAvatar} />
-              ) : (
-                <View style={styles.matchAvatarPlaceholder}>
-                  <Text style={styles.matchAvatarLetter}>{m.name.charAt(0)}</Text>
-                </View>
-              )}
-            </View>
-          ))}
+          {matches.map((m) => {
+            const src = matchEntryAvatarSource(m);
+            return (
+              <View key={m.id} style={styles.matchAvatarWrap}>
+                {src ? (
+                  <Image source={src} style={styles.matchAvatar} />
+                ) : (
+                  <View style={styles.matchAvatarPlaceholder}>
+                    <Text style={styles.matchAvatarLetter}>{m.name.charAt(0)}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
 
         <Text style={[styles.sectionTitle, styles.conversasTitle]}>Conversas</Text>
-        {matches.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            style={styles.conversaCard}
-            onPress={() =>
-              router.push({
-                pathname: '/(tabs)/chat-conversation',
-                params: { id: m.id, name: m.name, photoUri: m.photoUri ?? '' },
-              })
-            }
-            activeOpacity={0.8}>
-            {m.photoUri ? (
-              <Image source={{ uri: m.photoUri }} style={styles.conversaAvatar} />
-            ) : (
-              <View style={styles.conversaAvatarPlaceholder}>
-                <Text style={styles.conversaAvatarLetter}>{m.name.charAt(0)}</Text>
+        {matches.map((m) => {
+          const src = matchEntryAvatarSource(m);
+          return (
+            <TouchableOpacity
+              key={m.id}
+              style={styles.conversaCard}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/chat-conversation',
+                  params: { id: m.id, name: m.name, photoUri: m.photoUri ?? '' },
+                })
+              }
+              activeOpacity={0.8}>
+              {src ? (
+                <Image source={src} style={styles.conversaAvatar} />
+              ) : (
+                <View style={styles.conversaAvatarPlaceholder}>
+                  <Text style={styles.conversaAvatarLetter}>{m.name.charAt(0)}</Text>
+                </View>
+              )}
+              <View style={styles.conversaInfo}>
+                <Text style={styles.conversaName}>{m.name}</Text>
+                <Text style={styles.conversaPreview} numberOfLines={1}>
+                  {m.lastMessage || 'Conversa iniciada'}
+                </Text>
               </View>
-            )}
-            <View style={styles.conversaInfo}>
-              <Text style={styles.conversaName}>{m.name}</Text>
-              <Text style={styles.conversaPreview} numberOfLines={1}>
-                {m.lastMessage || 'Conversa iniciada'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </View>
   );
@@ -174,7 +181,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: ORANGE,
     justifyContent: 'center',
     alignItems: 'center',
   },

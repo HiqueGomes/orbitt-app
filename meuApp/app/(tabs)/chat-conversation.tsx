@@ -11,6 +11,7 @@ import {
   BackHandler,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,7 @@ import {
 import { updateMatchLastMessage, removeMatch } from '@/lib/match-storage';
 import { getCurrentUser } from '@/lib/auth-storage';
 import { notifyChatListRefresh } from '@/lib/chat-list-refresh';
+import { matchEntryAvatarSource } from '@/lib/mock-profile-avatars';
 
 const ORANGE = '#FF7A2A';
 
@@ -32,6 +34,16 @@ export default function ChatConversationScreen() {
   const params = useLocalSearchParams<{ id: string; name: string; photoUri?: string }>();
   const matchId = (Array.isArray(params.id) ? params.id[0] : params.id) ?? '';
   const matchName = (Array.isArray(params.name) ? params.name[0] : params.name) ?? 'Contato';
+  const photoUriParam = (() => {
+    const raw = params.photoUri;
+    const s = (Array.isArray(raw) ? raw[0] : raw) ?? '';
+    const t = String(s).trim();
+    return t.length > 0 ? t : null;
+  })();
+  const headerAvatarSrc = matchEntryAvatarSource({
+    id: matchId,
+    photoUri: photoUriParam,
+  });
   const [userId, setUserId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
@@ -160,10 +172,16 @@ export default function ChatConversationScreen() {
           <MaterialIcons name="arrow-back" size={24} color="#000000" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <View style={styles.logoCircleOuter}>
-            <View style={styles.logoCircleInner} />
-          </View>
-          <Text style={styles.headerTitle}>{matchName}</Text>
+          {headerAvatarSrc ? (
+            <Image source={headerAvatarSrc} style={styles.headerAvatar} />
+          ) : (
+            <View style={styles.headerAvatarPlaceholder}>
+              <Text style={styles.headerAvatarLetter}>{matchName.charAt(0)}</Text>
+            </View>
+          )}
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {matchName}
+          </Text>
         </View>
         <TouchableOpacity style={styles.infoButton} onPress={openOptionsMenu} hitSlop={12}>
           <MaterialIcons name="info-outline" size={24} color="#000000" />
@@ -282,25 +300,32 @@ const styles = StyleSheet.create({
   headerCenter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  logoCircleOuter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  headerAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: ORANGE,
-    justifyContent: 'center',
+  },
+  headerAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#D1D5DB',
     alignItems: 'center',
-  },
-  logoCircleInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: ORANGE,
+  },
+  headerAvatarLetter: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   headerTitle: {
     fontSize: 18,

@@ -99,6 +99,8 @@ export default function ProfileSetupScreen() {
       password: pending.password,
       photoUris,
       about: about.trim(),
+      musicStyles: pending.musicStyles ?? [],
+      favoriteVenueIds: pending.favoriteVenueIds ?? [],
     };
 
     await saveUser(user);

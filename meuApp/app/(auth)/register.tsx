@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,11 +8,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { savePendingRegistration } from '@/lib/auth-storage';
+import { MUSIC_STYLE_OPTIONS } from '@/lib/music-styles';
+import { APP_VENUES } from '@/lib/catalog-venues';
 
 /** Formata apenas dígitos no padrão DD/MM/AAAA (máx. 8 dígitos). */
 function formatBirthDateInput(value: string): string {
@@ -57,7 +60,16 @@ export default function RegisterScreen() {
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [musicStyles, setMusicStyles] = useState<string[]>([]);
+  const [favoriteVenueIds, setFavoriteVenueIds] = useState<string[]>([]);
+  const [venueSearch, setVenueSearch] = useState('');
   const [submitted, setSubmitted] = useState(false);
+
+  const filteredVenues = useMemo(() => {
+    const q = venueSearch.trim().toLowerCase();
+    if (!q) return APP_VENUES;
+    return APP_VENUES.filter((v) => v.name.toLowerCase().includes(q));
+  }, [venueSearch]);
 
   function handleBackPress() {
     router.back();
@@ -65,6 +77,16 @@ export default function RegisterScreen() {
 
   function handleBirthDateChange(text: string) {
     setBirthDate(formatBirthDateInput(text));
+  }
+
+  function toggleMusic(id: string) {
+    setMusicStyles((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleVenue(id: string) {
+    setFavoriteVenueIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   }
 
   async function handleSubmitPress() {
@@ -95,12 +117,19 @@ export default function RegisterScreen() {
       birthDate: birthDate.trim(),
       cpf: cpf.trim(),
       password,
+      musicStyles,
+      favoriteVenueIds,
     });
     router.push('/(auth)/profile-setup');
   }
 
   return (
-    <ThemedView style={styles.root}>
+    <ThemedView style={styles.root} lightColor="#FFFFFF" darkColor="#FFFFFF">
+      <View style={styles.flex}>
+        <View style={styles.circlesBg}>
+          <View style={[styles.bgCircle, styles.bgCircleOuter]} />
+          <View style={[styles.bgCircle, styles.bgCircleInner]} />
+        </View>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -197,6 +226,60 @@ export default function RegisterScreen() {
             {submitted && password && passwordConfirm && password !== passwordConfirm && (
               <Text style={styles.errorText}>As senhas precisam ser iguais.</Text>
             )}
+
+            <View style={[styles.labelRow, styles.labelSpaced]}>
+              <Text style={styles.label}>Estilos de música que curte</Text>
+              <Text style={styles.optionalTag}> (opcional)</Text>
+            </View>
+            <Text style={styles.hintText}>Toque para selecionar quantos quiser — ajuda o app a combinar você com eventos.</Text>
+            <View style={styles.chipWrap}>
+              {MUSIC_STYLE_OPTIONS.map((opt) => {
+                const on = musicStyles.includes(opt.id);
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.chip, on && styles.chipSelected]}
+                    onPress={() => toggleMusic(opt.id)}
+                    activeOpacity={0.8}>
+                    <Text style={[styles.chipText, on && styles.chipTextSelected]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={[styles.labelRow, styles.labelSpaced]}>
+              <Text style={styles.label}>Lugares favoritos</Text>
+              <Text style={styles.optionalTag}> (opcional)</Text>
+            </View>
+            <Text style={styles.hintText}>Locais cadastrados no Orbitt (bares e baladas).</Text>
+            <TextInput
+              value={venueSearch}
+              onChangeText={setVenueSearch}
+              placeholder="Pesquisar local ou evento..."
+              placeholderTextColor="#9CA3AF"
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.chipWrap}>
+              {filteredVenues.map((v) => {
+                const on = favoriteVenueIds.includes(v.id);
+                return (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={[styles.chip, styles.chipVenue, on && styles.chipSelected]}
+                    onPress={() => toggleVenue(v.id)}
+                    activeOpacity={0.8}>
+                    <Text style={[styles.chipText, on && styles.chipTextSelected]} numberOfLines={2}>
+                      {v.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {venueSearch.trim() && filteredVenues.length === 0 && (
+              <Text style={styles.searchEmptyText}>Nenhum local encontrado para essa busca.</Text>
+            )}
           </View>
 
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmitPress}>
@@ -204,12 +287,17 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      </View>
     </ThemedView>
   );
 }
 
 const ORANGE = '#FF7A2A';
 const INPUT_BG = '#F3F3F3';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CIRCLE_OUTER = SCREEN_WIDTH + 80;
+const CIRCLE_INNER = CIRCLE_OUTER * 0.52;
 
 const styles = StyleSheet.create({
   root: {
@@ -218,6 +306,33 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  circlesBg: {
+    ...StyleSheet.absoluteFillObject,
+    pointerEvents: 'none',
+  },
+  bgCircle: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 9999,
+    left: '50%',
+  },
+  bgCircleOuter: {
+    width: CIRCLE_OUTER,
+    height: CIRCLE_OUTER,
+    borderRadius: CIRCLE_OUTER / 2,
+    top: '50%',
+    marginTop: -CIRCLE_OUTER / 2,
+    marginLeft: -CIRCLE_OUTER / 2,
+  },
+  bgCircleInner: {
+    width: CIRCLE_INNER,
+    height: CIRCLE_INNER,
+    borderRadius: CIRCLE_INNER / 2,
+    top: '50%',
+    marginTop: -CIRCLE_INNER / 2,
+    marginLeft: -CIRCLE_INNER / 2,
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -272,11 +387,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 24,
   },
+  labelRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
   label: {
     fontSize: 13,
     fontWeight: '500',
-    marginBottom: 4,
     color: '#111111',
+  },
+  optionalTag: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   input: {
     height: 40,
@@ -305,6 +430,60 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontSize: 12,
     color: ORANGE,
+  },
+  searchInput: {
+    height: 40,
+    borderBottomWidth: 1.5,
+    borderBottomColor: ORANGE,
+    backgroundColor: INPUT_BG,
+    paddingHorizontal: 8,
+    marginBottom: 12,
+    fontSize: 14,
+    color: '#111111',
+  },
+  searchEmptyText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 10,
+    lineHeight: 18,
+  },
+  labelSpaced: {
+    marginTop: 16,
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: ORANGE,
+    backgroundColor: INPUT_BG,
+  },
+  chipVenue: {
+    maxWidth: '100%',
+  },
+  chipSelected: {
+    backgroundColor: ORANGE,
+    borderColor: ORANGE,
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#111111',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
   },
 });
 

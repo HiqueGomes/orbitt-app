@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,6 +16,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { getCurrentUser, updateUser, type StoredUser } from '@/lib/auth-storage';
+import { MUSIC_STYLE_OPTIONS } from '@/lib/music-styles';
+import { APP_VENUES } from '@/lib/catalog-venues';
 
 const ORANGE = '#FF7A2A';
 
@@ -26,7 +28,16 @@ export default function EditProfileScreen() {
   const [user, setUser] = useState<StoredUser | null>(null);
   const [photos, setPhotos] = useState<(string | null)[]>(Array(SLOT_COUNT).fill(null));
   const [about, setAbout] = useState('');
+  const [musicStyles, setMusicStyles] = useState<string[]>([]);
+  const [favoriteVenueIds, setFavoriteVenueIds] = useState<string[]>([]);
+  const [venueSearch, setVenueSearch] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const filteredVenues = useMemo(() => {
+    const q = venueSearch.trim().toLowerCase();
+    if (!q) return APP_VENUES;
+    return APP_VENUES.filter((v) => v.name.toLowerCase().includes(q));
+  }, [venueSearch]);
 
   useEffect(() => {
     getCurrentUser().then((u) => {
@@ -38,11 +49,23 @@ export default function EditProfileScreen() {
           .map((_, i) => uris[i] ?? null);
         setPhotos(slots);
         setAbout(u.about ?? '');
+        setMusicStyles(u.musicStyles ?? []);
+        setFavoriteVenueIds(u.favoriteVenueIds ?? []);
       } else {
         router.replace('/(tabs)/profile');
       }
     });
   }, [router]);
+
+  function toggleMusic(id: string) {
+    setMusicStyles((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleVenue(id: string) {
+    setFavoriteVenueIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
 
   async function handlePickPhoto(index: number, allowsEditing = true) {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -123,6 +146,8 @@ export default function EditProfileScreen() {
         ...user,
         photoUris,
         about: about.trim(),
+        musicStyles,
+        favoriteVenueIds,
       };
       await updateUser(updated);
       router.replace('/(tabs)/profile');
@@ -204,6 +229,64 @@ export default function EditProfileScreen() {
           multiline
           numberOfLines={4}
         />
+
+        <View style={styles.titleRow}>
+          <Text style={styles.sectionTitle}>Estilos de música que curte</Text>
+          <Text style={styles.optionalTag}> (opcional)</Text>
+        </View>
+        <Text style={styles.hintText}>Toque para selecionar quantos quiser.</Text>
+        <View style={styles.chipWrap}>
+          {MUSIC_STYLE_OPTIONS.map((opt) => {
+            const on = musicStyles.includes(opt.id);
+            return (
+              <TouchableOpacity
+                key={opt.id}
+                style={[styles.chip, on && styles.chipSelected]}
+                onPress={() => toggleMusic(opt.id)}
+                activeOpacity={0.8}>
+                <Text style={[styles.chipText, on && styles.chipTextSelected]}>{opt.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.titleRow}>
+          <Text style={styles.sectionTitle}>Lugares favoritos</Text>
+          <Text style={styles.optionalTag}> (opcional)</Text>
+        </View>
+        <Text style={styles.hintText}>Locais cadastrados no Orbitt.</Text>
+        <View style={styles.searchRow}>
+          <MaterialIcons name="search" size={20} color="#6B7280" style={styles.searchIcon} />
+          <TextInput
+            value={venueSearch}
+            onChangeText={setVenueSearch}
+            placeholder="Pesquisar local ou evento..."
+            placeholderTextColor="#9CA3AF"
+            style={styles.searchInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        <View style={styles.chipWrap}>
+          {filteredVenues.map((v) => {
+            const on = favoriteVenueIds.includes(v.id);
+            return (
+              <TouchableOpacity
+                key={v.id}
+                style={[styles.chip, on && styles.chipSelected]}
+                onPress={() => toggleVenue(v.id)}
+                activeOpacity={0.8}>
+                <Text style={[styles.chipText, on && styles.chipTextSelected]} numberOfLines={2}>
+                  {v.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {venueSearch.trim() && filteredVenues.length === 0 && (
+          <Text style={styles.searchEmptyText}>Nenhum local encontrado para essa busca.</Text>
+        )}
+
         <View style={styles.saveButtonSpacer} />
       </ScrollView>
 
@@ -280,12 +363,81 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
     flexGrow: 1,
   },
+  titleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    marginBottom: 4,
+    marginTop: 8,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#000000',
+  },
+  optionalTag: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  hintText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 10,
+    marginTop: 0,
+    lineHeight: 18,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 12,
     marginBottom: 12,
-    marginTop: 8,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 44,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#000000',
+  },
+  searchEmptyText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: ORANGE,
+    backgroundColor: '#FFE8D9',
+  },
+  chipSelected: {
+    backgroundColor: ORANGE,
+    borderColor: ORANGE,
+  },
+  chipText: {
+    fontSize: 13,
+    color: '#111111',
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
   },
   photosGrid: {
     flexDirection: 'row',

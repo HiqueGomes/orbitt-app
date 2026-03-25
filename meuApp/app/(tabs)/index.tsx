@@ -10,6 +10,7 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  type ImageSourcePropType,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,6 +25,11 @@ import {
   type AppNotification,
 } from '@/lib/notification-storage';
 import { NotificationsModal } from '@/components/NotificationsModal';
+import {
+  getMockAvatarSourceForProfileId,
+  profileImageSource,
+  matchEntryAvatarSource,
+} from '@/lib/mock-profile-avatars';
 
 const ORANGE = '#FF7A2A';
 const SWIPE_THRESHOLD = 60;
@@ -37,15 +43,15 @@ interface DiscoverProfile {
   name: string;
   age: number;
   photoUri: string | null;
-  /** Lista de fotos do perfil (galeria). Se vazio ou ausente, mostra placeholder. */
-  photos?: string[];
+  /** Galeria: `require(...)` (bundle) ou `{ uri }` remoto/local. */
+  photos?: ImageSourcePropType[];
   events: { venueName: string; day: string }[];
   aboutMe?: string;
   interests?: string[];
   favoritePlaces?: string[];
 }
 
-const MOCK_PROFILES: DiscoverProfile[] = [
+const MOCK_PROFILES_RAW: DiscoverProfile[] = [
   {
     id: '1',
     name: 'Mariana',
@@ -483,6 +489,15 @@ const MOCK_PROFILES: DiscoverProfile[] = [
   },
 ];
 
+const MOCK_PROFILES: DiscoverProfile[] = MOCK_PROFILES_RAW.map((p) => {
+  const a = getMockAvatarSourceForProfileId(p.id)!;
+  return {
+    ...p,
+    photoUri: null,
+    photos: [a, a, a],
+  };
+});
+
 function buildUserEventKeys(selected: SelectedEventEntry[]): Set<string> {
   const set = new Set<string>();
   selected.forEach((e) => {
@@ -719,6 +734,11 @@ export default function HomeScreen() {
   if (!hasEvents) {
     return (
       <View style={styles.root}>
+        <NotificationsModal
+          visible={showNotifications}
+          onClose={closeNotifications}
+          notifications={notifications}
+        />
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.logoCircleOuter}>
@@ -729,7 +749,7 @@ export default function HomeScreen() {
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.bellButton} onPress={openNotifications} hitSlop={12}>
               <MaterialIcons name="notifications" size={24} color="#000000" />
-              {hasUnread && <View style={styles.bellDot} />}
+              {(hasUnread || hasEvents) && <View style={styles.bellDot} />}
             </TouchableOpacity>
             <TouchableOpacity style={styles.filterButton} hitSlop={12}>
               <MaterialIcons name="tune" size={24} color="#000000" />
@@ -874,10 +894,12 @@ export default function HomeScreen() {
                   {(expandedProfile.photos && expandedProfile.photos.length > 0
                     ? expandedProfile.photos
                     : [null, null, null]
-                  ).map((uri, index) => (
+                  ).map((ph, index) => {
+                    const imgSrc = profileImageSource(ph as ImageSourcePropType | string | null);
+                    return (
                     <View key={index} style={[styles.expandedPhotoStripSlide, { width: SCREEN_WIDTH - 40 }]}>
-                      {uri ? (
-                        <Image source={{ uri }} style={styles.expandedPhotoStripImage} />
+                      {imgSrc ? (
+                        <Image source={imgSrc} style={styles.expandedPhotoStripImage} />
                       ) : (
                         <View style={styles.expandedPhotoStripPlaceholder}>
                           <Text style={styles.expandedPhotoStripLetter}>
@@ -887,7 +909,8 @@ export default function HomeScreen() {
                         </View>
                       )}
                     </View>
-                  ))}
+                    );
+                  })}
                 </ScrollView>
                 <View style={styles.expandedPhotoDots}>
                   {(expandedProfile.photos && expandedProfile.photos.length > 0
@@ -985,18 +1008,21 @@ export default function HomeScreen() {
         <View style={styles.matchRoot}>
           {matchProfile && (
             <>
-              {matchProfile.photoUri ? (
-                <Image
-                  source={{ uri: matchProfile.photoUri }}
-                  style={styles.matchBackgroundImage}
-                />
-              ) : (
+              {(() => {
+                const matchImg = matchEntryAvatarSource({
+                  id: matchProfile.id,
+                  photoUri: matchProfile.photoUri,
+                });
+                return matchImg ? (
+                  <Image source={matchImg} style={styles.matchBackgroundImage} />
+                ) : (
                 <View style={styles.matchBackgroundPlaceholder}>
                   <Text style={styles.matchPlaceholderLetter}>
                     {matchProfile.name.charAt(0)}
                   </Text>
                 </View>
-              )}
+                );
+              })()}
               <TouchableOpacity
                 style={styles.matchCloseButton}
                 onPress={closeMatch}
@@ -1075,9 +1101,10 @@ export default function HomeScreen() {
           ]}
           {...panResponder.panHandlers}>
           {(() => {
-            const uri = cardSlides[cardPhotoIndexState] ?? null;
-            return uri ? (
-              <Image source={{ uri }} style={styles.cardImage} />
+            const slide = cardSlides[cardPhotoIndexState];
+            const src = profileImageSource(slide as ImageSourcePropType | string | null);
+            return src ? (
+              <Image source={src} style={styles.cardImage} />
             ) : (
               <View style={styles.cardImagePlaceholder}>
                 <Text style={styles.cardImagePlaceholderText}>
@@ -1168,7 +1195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 56,
-    paddingBottom: 12,
+    paddingBottom: 16,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1180,7 +1207,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: ORANGE,
     justifyContent: 'center',
     alignItems: 'center',
   },

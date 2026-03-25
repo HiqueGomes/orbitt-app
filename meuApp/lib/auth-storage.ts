@@ -11,6 +11,10 @@ export interface PendingRegistration {
   birthDate: string;
   cpf: string;
   password: string;
+  /** IDs de estilos musicais (ver lib/music-styles). */
+  musicStyles: string[];
+  /** IDs de locais do catálogo (lib/catalog-venues). */
+  favoriteVenueIds: string[];
 }
 
 export interface StoredUser {
@@ -23,6 +27,8 @@ export interface StoredUser {
   password: string;
   photoUris: string[];
   about: string;
+  musicStyles: string[];
+  favoriteVenueIds: string[];
 }
 
 export async function savePendingRegistration(data: PendingRegistration): Promise<void> {
@@ -33,7 +39,17 @@ export async function getPendingRegistration(): Promise<PendingRegistration | nu
   const raw = await AsyncStorage.getItem(PENDING_REG_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as PendingRegistration;
+    const p = JSON.parse(raw) as Partial<PendingRegistration>;
+    return {
+      firstName: p.firstName ?? '',
+      lastName: p.lastName ?? '',
+      email: p.email ?? '',
+      birthDate: p.birthDate ?? '',
+      cpf: p.cpf ?? '',
+      password: p.password ?? '',
+      musicStyles: Array.isArray(p.musicStyles) ? p.musicStyles : [],
+      favoriteVenueIds: Array.isArray(p.favoriteVenueIds) ? p.favoriteVenueIds : [],
+    };
   } catch {
     return null;
   }
@@ -87,10 +103,18 @@ export async function findUserByIdentifierAndPassword(
     const emailMatch = user.email.trim().toLowerCase() === idNorm;
     const cpfMatch = normalizeIdentifier(user.cpf) === idDigits;
     if ((emailMatch || cpfMatch) && user.password === password) {
-      return user;
+      return normalizeStoredUser(user);
     }
   }
   return null;
+}
+
+function normalizeStoredUser(user: StoredUser): StoredUser {
+  return {
+    ...user,
+    musicStyles: Array.isArray(user.musicStyles) ? user.musicStyles : [],
+    favoriteVenueIds: Array.isArray(user.favoriteVenueIds) ? user.favoriteVenueIds : [],
+  };
 }
 
 export async function setCurrentUser(user: StoredUser | null): Promise<void> {
@@ -105,7 +129,7 @@ export async function getCurrentUser(): Promise<StoredUser | null> {
   const raw = await AsyncStorage.getItem(CURRENT_USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as StoredUser;
+    return normalizeStoredUser(JSON.parse(raw) as StoredUser);
   } catch {
     return null;
   }

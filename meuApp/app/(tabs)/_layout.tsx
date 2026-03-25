@@ -1,18 +1,40 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 
 import { HapticTab } from '@/components/haptic-tab';
+import { CurtidasBadgeProvider, useCurtidasBadge } from '@/contexts/CurtidasBadgeContext';
 
 const ORANGE = '#FF7A2A';
 
+function CurtidasTabIcon({ color, focused }: { color: string; focused: boolean }) {
+  const { count } = useCurtidasBadge();
+  const filled = focused || color === ORANGE || color.toLowerCase().includes('ff7a2a');
+  const heartColor = filled ? ORANGE : '#9CA3AF';
+  const badgeLabel = count > 99 ? '99+' : String(count);
+  return (
+    <View style={styles.curtidasIconWrap}>
+      <MaterialIcons name="favorite" size={28} color={heartColor} />
+      <Text style={styles.curtidasIconBadge} numberOfLines={1}>
+        {badgeLabel}
+      </Text>
+    </View>
+  );
+}
+
 function OrbitTabIcon({ color }: { color: string }) {
   const isOrange = color === ORANGE || color.toLowerCase().includes('ff7a2a');
+  const ring = isOrange ? ORANGE : '#9CA3AF';
   return (
     <View style={styles.orbitWrap}>
-      <View style={[styles.orbitOuter, { borderColor: isOrange ? ORANGE : '#9CA3AF' }]}>
-        <View style={[styles.orbitInner, { backgroundColor: isOrange ? ORANGE : 'transparent' }]} />
+      <View style={[styles.orbitOuter, { borderColor: ring }]}>
+        <View
+          style={[
+            styles.orbitInner,
+            { borderColor: ring, borderWidth: 2, backgroundColor: 'transparent' },
+          ]}
+        />
       </View>
     </View>
   );
@@ -20,6 +42,7 @@ function OrbitTabIcon({ color }: { color: string }) {
 
 export default function TabLayout() {
   return (
+    <CurtidasBadgeProvider>
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: ORANGE,
@@ -44,8 +67,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="favorites"
         options={{
-          title: 'Favoritos',
-          tabBarIcon: ({ color }) => <MaterialIcons name="favorite" size={26} color={color} />,
+          title: 'Curtidas',
+          tabBarIcon: ({ color, focused }) => <CurtidasTabIcon color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -98,10 +121,26 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </CurtidasBadgeProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  curtidasIconWrap: {
+    width: 34,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  curtidasIconBadge: {
+    position: 'absolute',
+    marginTop: 4,
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
+    minWidth: 14,
+    textAlign: 'center',
+  },
   orbitWrap: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -12,6 +12,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { getCurrentUser, setCurrentUser, type StoredUser } from '@/lib/auth-storage';
 import { clearSelectedEvents } from '@/lib/event-storage';
+import { getMusicStyleLabel } from '@/lib/music-styles';
+import { getVenueNameById } from '@/lib/catalog-venues';
+import { formatDisplayFullName, formatNamePart } from '@/lib/format-name';
 
 const ORANGE = '#FF7A2A';
 
@@ -56,12 +59,14 @@ function parseAge(birthDate: string | undefined): number | null {
 
 function profileCompletePercent(user: StoredUser): number {
   let n = 0;
-  const total = 5;
+  const total = 7;
   if (user.photoUris.length > 0) n++;
   if (user.about.trim()) n++;
   if (user.firstName.trim()) n++;
   if (user.birthDate.trim()) n++;
   if (user.email.trim()) n++;
+  if ((user.musicStyles ?? []).length > 0) n++;
+  if ((user.favoriteVenueIds ?? []).length > 0) n++;
   return Math.round((n / total) * 100);
 }
 
@@ -114,7 +119,12 @@ export default function ProfileScreen() {
 
   const profilePhotoUri = user.photoUris.length > 0 ? user.photoUris[0] : null;
   const showPhoto = profilePhotoUri && !photoLoadFailed;
-  const fullName = `${user.firstName.trim()} ${user.lastName.trim()}`.trim() || 'Usuário';
+  const displayFirst = formatNamePart(user.firstName);
+  const displayLast = formatNamePart(user.lastName);
+  const fullName = formatDisplayFullName(user.firstName, user.lastName) || 'Usuário';
+  const initialA = (displayFirst || user.firstName.trim()).charAt(0).toUpperCase();
+  const initialB = (displayLast || user.lastName.trim()).charAt(0).toUpperCase();
+  const initials = `${initialA}${initialB}`.trim() || '?';
   const age = parseAge(user.birthDate);
   const percent = profileCompletePercent(user);
 
@@ -156,10 +166,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoPlaceholderText}>
-                  {user.firstName.charAt(0)}
-                  {user.lastName.charAt(0)}
-                </Text>
+                <Text style={styles.photoPlaceholderText}>{initials}</Text>
               </View>
             )}
             <TouchableOpacity
@@ -189,6 +196,35 @@ export default function ProfileScreen() {
         <View style={styles.bioBox}>
           <Text style={styles.bioText}>{user.about.trim() || 'Nenhuma descrição.'}</Text>
         </View>
+
+        {(user.musicStyles?.length ?? 0) > 0 && (
+          <View style={styles.prefSection}>
+            <Text style={styles.prefTitle}>Estilos de música</Text>
+            <View style={styles.prefChips}>
+              {(user.musicStyles ?? []).map((id) => (
+                <View key={id} style={styles.prefChip}>
+                  <Text style={styles.prefChipText}>{getMusicStyleLabel(id)}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {(user.favoriteVenueIds?.length ?? 0) > 0 && (
+          <View style={styles.prefSection}>
+            <Text style={styles.prefTitle}>Lugares favoritos</Text>
+            <View style={styles.prefChips}>
+              {(user.favoriteVenueIds ?? []).map((id) => {
+                const name = getVenueNameById(id) ?? id;
+                return (
+                  <View key={id} style={styles.prefChip}>
+                    <Text style={styles.prefChipText}>{name}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Plano Orbitt - Grátis vs Plus */}
         <View style={styles.planBox}>
@@ -268,7 +304,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: ORANGE,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -386,6 +422,33 @@ const styles = StyleSheet.create({
   bioText: {
     fontSize: 14,
     color: '#374151',
+  },
+  prefSection: {
+    marginBottom: 16,
+  },
+  prefTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  prefChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  prefChip: {
+    backgroundColor: '#FFE8D9',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: ORANGE,
+  },
+  prefChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#C2410C',
   },
   planBox: {
     backgroundColor: ORANGE,

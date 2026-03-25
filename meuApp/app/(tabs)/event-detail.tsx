@@ -8,7 +8,7 @@ import {
   Linking,
   BackHandler,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { addSelectedEvents, getSelectedEvents } from '@/lib/event-storage';
@@ -370,7 +370,6 @@ const DEFAULT_VENUE: VenueDetail = {
 };
 
 export default function EventDetailScreen() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const id = params.id ?? '1';
   const venue = VENUE_DETAILS[id] ?? { ...DEFAULT_VENUE, name: `Evento ${id}` };
@@ -398,19 +397,23 @@ export default function EventDetailScreen() {
     }, [id])
   );
 
-  function handleBack() {
+  /** Sempre o catálogo (busca + recomendados + grade), sem depender de `back()` — a pilha do tab pode voltar ao Início/errado. */
+  function goBackToEventCatalog() {
     setSelectedDays(new Set());
-    router.replace('/(tabs)/explore');
+    router.replace('/(tabs)/scheduled-events');
+  }
+
+  function handleBack() {
+    goBackToEventCatalog();
   }
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setSelectedDays(new Set());
-      router.replace('/(tabs)/explore');
+      goBackToEventCatalog();
       return true;
     });
     return () => sub.remove();
-  }, [router]);
+  }, []);
 
   async function handleSave() {
     const days = venue.schedule

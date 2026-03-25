@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,47 +9,23 @@ import {
   Modal,
   Pressable,
   TouchableWithoutFeedback,
+  BackHandler,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { APP_VENUES, venuesMatchingUserMusicStyles } from '@/lib/catalog-venues';
+import { getMusicStyleLabel } from '@/lib/music-styles';
+import { getCurrentUser } from '@/lib/auth-storage';
+import { getSelectedEvents } from '@/lib/event-storage';
+import { useCurtidasBadge } from '@/contexts/CurtidasBadgeContext';
 
 const ORANGE = '#FF7A2A';
 const FILTER_BG = '#E88B5C';
 
 export type EventTypeFilter = 'todos' | 'bar' | 'balada';
 
-const WEEK_EVENTS: { id: string; name: string; style: string; type: 'bar' | 'balada' }[] = [
-  { id: '1', name: 'Beco Espeto', style: 'badge', type: 'bar' },
-  { id: '2', name: 'VILAK', style: 'simple', type: 'balada' },
-  { id: '3', name: 'GALERIA BAR', style: 'gradient', type: 'bar' },
-  { id: '4', name: 'MAHAU', style: 'simple', type: 'balada' },
-  { id: '5', name: 'AMATA', style: 'simple', type: 'balada' },
-  { id: '6', name: 'VITRINNI Lounge Beer', style: 'gold', type: 'bar' },
-  { id: '7', name: 'D-Edge', style: 'gradient', type: 'balada' },
-  { id: '8', name: 'Skye', style: 'gold', type: 'bar' },
-  { id: '9', name: 'Beco 203', style: 'simple', type: 'bar' },
-  { id: '10', name: 'Blitz Haus', style: 'badge', type: 'bar' },
-  { id: '11', name: 'Selvagem', style: 'simple', type: 'balada' },
-  { id: '12', name: 'Ó do Borogodó', style: 'gradient', type: 'bar' },
-  { id: '13', name: 'Trackers', style: 'simple', type: 'bar' },
-  { id: '14', name: 'All Black', style: 'badge', type: 'balada' },
-  { id: '15', name: 'Canto da Ema', style: 'gold', type: 'bar' },
-  { id: '16', name: 'Veloso', style: 'simple', type: 'bar' },
-  { id: '17', name: 'Lions Nightclub', style: 'gradient', type: 'balada' },
-  { id: '18', name: 'Bourbon Street', style: 'gold', type: 'bar' },
-  { id: '19', name: 'The Week', style: 'badge', type: 'balada' },
-  { id: '20', name: 'Astor', style: 'simple', type: 'bar' },
-  { id: '21', name: 'Mamba Negra', style: 'gradient', type: 'balada' },
-  { id: '22', name: 'Bar do Zé', style: 'simple', type: 'bar' },
-  { id: '23', name: 'Club Noir', style: 'badge', type: 'balada' },
-  { id: '24', name: 'Empório Alto de Pinheiros', style: 'gold', type: 'bar' },
-  { id: '25', name: 'JazzB', style: 'simple', type: 'bar' },
-  { id: '26', name: 'View Rooftop', style: 'gradient', type: 'bar' },
-  { id: '27', name: 'Casa da Luz', style: 'simple', type: 'balada' },
-  { id: '28', name: 'Bar dos Artesãos', style: 'gold', type: 'bar' },
-  { id: '29', name: 'Laroc Club', style: 'badge', type: 'balada' },
-  { id: '30', name: 'Boteco do Espanha', style: 'simple', type: 'bar' },
-];
+const WEEK_EVENTS = APP_VENUES;
 
 const FILTER_LABELS: Record<EventTypeFilter, string> = {
   todos: 'Todos',
@@ -58,10 +34,51 @@ const FILTER_LABELS: Record<EventTypeFilter, string> = {
 };
 
 export default function ScheduledEventsScreen() {
-  const router = useRouter();
+  const { refreshCurtidasBadge } = useCurtidasBadge();
   const [search, setSearch] = useState('');
   const [eventTypeFilter, setEventTypeFilter] = useState<EventTypeFilter>('todos');
   const [dropdownVisible, setDropdownVisible] = useState(false);
+  const [userMusicStyles, setUserMusicStyles] = useState<string[]>([]);
+  const [scheduledVenueIds, setScheduledVenueIds] = useState<Set<string>>(new Set());
+
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
+      getCurrentUser().then((user) => {
+        if (!mounted) return;
+        setUserMusicStyles(user && Array.isArray(user.musicStyles) ? user.musicStyles : []);
+      });
+      getSelectedEvents().then((list) => {
+        if (!mounted) return;
+        setScheduledVenueIds(new Set(list.map((e) => e.eventId)));
+      });
+      void refreshCurtidasBadge();
+      return () => {
+        mounted = false;
+      };
+    }, [refreshCurtidasBadge])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.dismissTo('/(tabs)/explore');
+        return true;
+      });
+      return () => sub.remove();
+    }, [])
+  );
+
+  const recommendedVenues = useMemo(() => {
+    const matched = venuesMatchingUserMusicStyles(userMusicStyles);
+    const filtered = matched.filter((v) => !scheduledVenueIds.has(v.id));
+    const scored = filtered.map((v) => ({
+      v,
+      score: v.topMusicStyles.filter((m) => userMusicStyles.includes(m)).length,
+    }));
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.v).slice(0, 16);
+  }, [userMusicStyles, scheduledVenueIds]);
 
   const filteredEvents = WEEK_EVENTS.filter((event) => {
     const matchSearch = !search.trim() || event.name.toLowerCase().includes(search.trim().toLowerCase());
@@ -70,7 +87,7 @@ export default function ScheduledEventsScreen() {
   });
 
   function handleBack() {
-    router.replace('/(tabs)/explore');
+    router.dismissTo('/(tabs)/explore');
   }
 
   function handleSelectEvent(id: string) {
@@ -148,7 +165,48 @@ export default function ScheduledEventsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Eventos da semana</Text>
+        <Text style={styles.recSectionTitle}>Recomendados para você</Text>
+        <Text style={styles.recSectionSubtitle}>
+          Locais no catálogo que combinam com os estilos musicais do seu cadastro (toque para ver detalhes e
+          programar).
+        </Text>
+        {userMusicStyles.length === 0 ? (
+          <Text style={styles.recHintText}>
+            Adicione estilos musicais no seu perfil para ver sugestões personalizadas aqui.
+          </Text>
+        ) : recommendedVenues.length === 0 ? (
+          <Text style={styles.recHintText}>
+            Não há mais locais que combinem com seu gosto neste catálogo, ou você já os programou.
+          </Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recRow}
+            style={styles.recHorizontal}>
+            {recommendedVenues.map((v) => (
+              <TouchableOpacity
+                key={v.id}
+                style={styles.recCard}
+                onPress={() => handleSelectEvent(v.id)}
+                activeOpacity={0.85}>
+                <Text style={styles.recCardName} numberOfLines={2}>
+                  {v.name}
+                </Text>
+                <Text style={styles.recCardMeta}>{v.type === 'balada' ? 'Balada' : 'Bar'}</Text>
+                <View style={styles.recCardTags}>
+                  {v.topMusicStyles.map((sid) => (
+                    <View key={sid} style={styles.recTagChip}>
+                      <Text style={styles.recTagChipText}>{getMusicStyleLabel(sid)}</Text>
+                    </View>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        <Text style={[styles.sectionTitle, styles.sectionTitleAfterRec]}>Eventos da semana</Text>
 
         {filteredEvents.length === 0 ? (
           <Text style={styles.emptyFilter}>
@@ -177,6 +235,20 @@ export default function ScheduledEventsScreen() {
                   numberOfLines={2}>
                   {event.name}
                 </Text>
+                <View style={styles.cardStylesRow}>
+                  {event.topMusicStyles.slice(0, 2).map((sid) => (
+                    <Text
+                      key={sid}
+                      style={[
+                        styles.cardStyleLabel,
+                        event.style === 'gradient' && styles.cardStyleLabelGradient,
+                        event.style === 'gold' && styles.cardStyleLabelGold,
+                      ]}
+                      numberOfLines={1}>
+                      {getMusicStyleLabel(sid)}
+                    </Text>
+                  ))}
+                </View>
                 {event.style === 'badge' && (
                   <Text style={styles.cardStars}>★★★</Text>
                 )}
@@ -334,11 +406,76 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 32,
   },
+  recSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  recSectionSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  recHintText: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  recHorizontal: {
+    marginHorizontal: -20,
+    marginBottom: 8,
+  },
+  recRow: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    gap: 10,
+  },
+  recCard: {
+    width: 168,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  recCardName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  recCardMeta: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  recCardTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  recTagChip: {
+    backgroundColor: 'rgba(255,122,42,0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  recTagChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: ORANGE,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#000000',
     marginBottom: 16,
+  },
+  sectionTitleAfterRec: {
+    marginTop: 12,
   },
   emptyFilter: {
     fontSize: 15,
@@ -396,5 +533,25 @@ const styles = StyleSheet.create({
   cardCrown: {
     position: 'absolute',
     top: 6,
+  },
+  cardStylesRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 3,
+    maxWidth: '100%',
+  },
+  cardStyleLabel: {
+    fontSize: 7,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.88)',
+    textAlign: 'center',
+  },
+  cardStyleLabelGradient: {
+    color: 'rgba(249,115,22,0.95)',
+  },
+  cardStyleLabelGold: {
+    color: 'rgba(212,175,55,0.95)',
   },
 });

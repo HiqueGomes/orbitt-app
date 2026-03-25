@@ -24,6 +24,9 @@ import {
   type AppNotification,
 } from '@/lib/notification-storage';
 import { NotificationsModal } from '@/components/NotificationsModal';
+import { getVenueById } from '@/lib/catalog-venues';
+import { getMusicStyleLabel } from '@/lib/music-styles';
+import { useCurtidasBadge } from '@/contexts/CurtidasBadgeContext';
 
 const ORANGE = '#FF7A2A';
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -32,6 +35,7 @@ const CIRCLE_INNER = CIRCLE_OUTER * 0.52;
 
 export default function EventsScreen() {
   const router = useRouter();
+  const { refreshCurtidasBadge } = useCurtidasBadge();
   const [selectedEvents, setSelectedEvents] = useState<SelectedEventEntry[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -42,6 +46,7 @@ export default function EventsScreen() {
       getSelectedEvents().then((list) => {
         if (mounted) setSelectedEvents(list);
       });
+      void refreshCurtidasBadge();
       getCurrentUser().then((user) => {
         if (mounted && user) {
           getNotifications(user.id).then((list) => {
@@ -52,7 +57,7 @@ export default function EventsScreen() {
       return () => {
         mounted = false;
       };
-    }, [])
+    }, [refreshCurtidasBadge])
   );
 
   const hasUnread = hasUnreadNotifications(notifications);
@@ -75,6 +80,7 @@ export default function EventsScreen() {
   async function handleRemove(id: string) {
     await removeSelectedEvent(id);
     setSelectedEvents((prev) => prev.filter((e) => e.id !== id));
+    void refreshCurtidasBadge();
   }
 
   function handleAddScheduledEvent() {
@@ -127,19 +133,33 @@ export default function EventsScreen() {
               </TouchableOpacity>
             </View>
 
-            {selectedEvents.map((entry) => (
-              <View key={entry.id} style={styles.eventChip}>
-                <Text style={styles.eventChipText} numberOfLines={1}>
-                  {entry.venueName} - {getShortDay(entry.day)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemove(entry.id)}
-                  hitSlop={8}>
-                  <MaterialIcons name="remove" size={22} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            ))}
+            {selectedEvents.map((entry) => {
+              const venue = getVenueById(entry.eventId);
+              return (
+                <View key={entry.id} style={styles.eventChip}>
+                  <View style={styles.eventChipLeft}>
+                    <Text style={styles.eventChipText} numberOfLines={1}>
+                      {entry.venueName} - {getShortDay(entry.day)}
+                    </Text>
+                    {venue ? (
+                      <View style={styles.musicTagsRow}>
+                        {venue.topMusicStyles.map((sid) => (
+                          <View key={sid} style={styles.musicTagPill}>
+                            <Text style={styles.musicTagPillText}>{getMusicStyleLabel(sid)}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemove(entry.id)}
+                    hitSlop={8}>
+                    <MaterialIcons name="remove" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
 
             <TouchableOpacity
               style={styles.dashedButton}
@@ -212,7 +232,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: ORANGE,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -289,7 +309,7 @@ const styles = StyleSheet.create({
   },
   eventChip: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     backgroundColor: ORANGE,
     borderRadius: 14,
@@ -297,9 +317,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  eventChipText: {
+  eventChipLeft: {
     flex: 1,
+    marginRight: 8,
+  },
+  eventChipText: {
     fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  musicTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  musicTagPill: {
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  musicTagPillText: {
+    fontSize: 11,
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -311,6 +351,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
+    alignSelf: 'center',
   },
   dashedButton: {
     width: '100%',
